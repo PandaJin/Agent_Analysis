@@ -1,23 +1,32 @@
-// 筛选功能模块 - v2.0
-// 新增：商业模式二级筛选
+// 筛选功能模块 - v3.0
+// 第一级：技术栈 → 第二级：层级细分/应用场景 → 第三级：仅应用场景细分
 
 let currentFilters = {
     layer: '',
     scene: '',
     region: '',
     model: '',
-    modelSub: '',  // 新增：商业模式二级筛选
+    modelSub: '',
     subScene: '',
     search: ''
 };
 
-// 商业模式二级分类定义
+// 应用场景（仅应用层时在第二级展示）的选项
+const sceneLabels = {
+    'general': '通用场景',
+    'horizontal': '水平场景',
+    'function': '行业职能',
+    'vertical': '行业垂直'
+};
+
+// 商业模式二级分类（与 metadata 一致，可后续改为从 metadata 读取）
 const modelSubCategories = {
     '2b': {
         'saas': 'SaaS订阅',
         'private': '私有化部署',
         'api': 'API调用计费',
-        'project': '项目制咨询'
+        'project': '项目制咨询',
+        'platform': '平台授权'
     },
     '2c': {
         'freemium': '免费+会员',
@@ -34,68 +43,137 @@ const modelSubCategories = {
 
 // 初始化筛选器
 document.addEventListener('DOMContentLoaded', () => {
-    // 主筛选器事件
-    document.getElementById('layerFilter').addEventListener('change', handleFilterChange);
-    document.getElementById('sceneFilter').addEventListener('change', handleSceneChange);
+    document.querySelectorAll('.layer-tab').forEach(btn => {
+        btn.addEventListener('click', () => setLayer(btn.dataset.layer || ''));
+    });
     document.getElementById('regionFilter').addEventListener('change', handleFilterChange);
-    document.getElementById('modelFilter').addEventListener('change', handleModelChange);  // 修改：添加商业模式变化处理
+    document.getElementById('modelFilter').addEventListener('change', handleModelChange);
     document.getElementById('searchInput').addEventListener('input', handleSearchChange);
 });
 
 function handleFilterChange(e) {
     const filterId = e.target.id;
     const value = e.target.value;
-    
-    if (filterId === 'layerFilter') currentFilters.layer = value;
-    else if (filterId === 'regionFilter') currentFilters.region = value;
-    
+    if (filterId === 'regionFilter') currentFilters.region = value;
+    else if (filterId === 'modelFilter') currentFilters.model = value;
     applyFilters();
 }
 
-function handleSceneChange(e) {
-    const value = e.target.value;
-    currentFilters.scene = value;
-    currentFilters.subScene = ''; // 重置二级筛选
-    
-    // 显示/隐藏场景二级筛选
-    const subFiltersContainer = document.getElementById('subFilters');
-    if (value && metadata.subScenes && metadata.subScenes[value]) {
-        renderSubFilters(value, 'scene');
-        subFiltersContainer.classList.add('active');
-    } else {
-        subFiltersContainer.classList.remove('active');
+function setLayer(value) {
+    const metadata = window.metadata || {};
+    currentFilters.layer = value;
+    currentFilters.scene = '';
+    currentFilters.subScene = '';
+
+    document.querySelectorAll('.layer-tab').forEach(t => {
+        t.classList.toggle('active', (t.dataset.layer || '') === value);
+        t.setAttribute('aria-selected', (t.dataset.layer || '') === value ? 'true' : 'false');
+    });
+
+    const subFiltersEl = document.getElementById('subFilters');
+    const sceneSubFiltersEl = document.getElementById('sceneSubFilters');
+    sceneSubFiltersEl.classList.remove('active');
+    sceneSubFiltersEl.innerHTML = '';
+
+    if (!value) {
+        subFiltersEl.classList.remove('active');
+        subFiltersEl.innerHTML = '';
+        applyFilters();
+        return;
     }
-    
+
+    if (value === 'application') {
+        subFiltersEl.innerHTML = Object.entries(sceneLabels).map(([key, label]) =>
+            `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="scene">${label}</button>`
+        ).join('');
+        subFiltersEl.classList.add('active');
+        subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'scene'));
+        });
+    } else if (metadata.subScenes && metadata.subScenes[value]) {
+        const subScenes = metadata.subScenes[value];
+        subFiltersEl.innerHTML = Object.entries(subScenes).map(([key, label]) =>
+            `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="layerSub">${label}</button>`
+        ).join('');
+        subFiltersEl.classList.add('active');
+        subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'layerSub'));
+        });
+    } else {
+        subFiltersEl.classList.remove('active');
+        subFiltersEl.innerHTML = '';
+    }
     applyFilters();
 }
 
-// 新增：处理商业模式变化
+function handleSubFilterClick(value, type) {
+    const subFiltersEl = document.getElementById('subFilters');
+    const sceneSubFiltersEl = document.getElementById('sceneSubFilters');
+
+    if (type === 'layerSub') {
+        currentFilters.scene = '';
+        currentFilters.subScene = currentFilters.subScene === value ? '' : value;
+        sceneSubFiltersEl.classList.remove('active');
+        sceneSubFiltersEl.innerHTML = '';
+        subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
+            chip.classList.toggle('active', chip.getAttribute('data-value') === currentFilters.subScene);
+        });
+    } else if (type === 'scene') {
+        currentFilters.subScene = '';
+        currentFilters.scene = currentFilters.scene === value ? '' : value;
+        subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
+            chip.classList.toggle('active', chip.getAttribute('data-value') === currentFilters.scene);
+        });
+        // 第三级：仅当应用层且选了有细分的场景时展示
+        const metadata = window.metadata || {};
+        if (currentFilters.scene && metadata.subScenes && metadata.subScenes[currentFilters.scene]) {
+            const subScenes = metadata.subScenes[currentFilters.scene];
+            sceneSubFiltersEl.innerHTML = Object.entries(subScenes).map(([key, label]) =>
+                `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="sceneSub">${label}</button>`
+            ).join('');
+            sceneSubFiltersEl.classList.add('active');
+            sceneSubFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'sceneSub'));
+            });
+        } else {
+            sceneSubFiltersEl.classList.remove('active');
+            sceneSubFiltersEl.innerHTML = '';
+        }
+    } else if (type === 'sceneSub') {
+        currentFilters.subScene = currentFilters.subScene === value ? '' : value;
+        sceneSubFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
+            chip.classList.toggle('active', chip.getAttribute('data-value') === currentFilters.subScene);
+        });
+    } else if (type === 'model') {
+        currentFilters.modelSub = currentFilters.modelSub === value ? '' : value;
+        document.querySelectorAll('#modelSubFilters .sub-filter-chip').forEach(chip => {
+            chip.classList.toggle('active', chip.getAttribute('data-value') === currentFilters.modelSub);
+        });
+    }
+
+    applyFilters();
+}
+
 function handleModelChange(e) {
     const value = e.target.value;
     currentFilters.model = value;
-    currentFilters.modelSub = ''; // 重置二级筛选
-    
-    // 显示/隐藏商业模式二级筛选
-    const modelSubContainer = document.getElementById('modelSubFilters');
-    if (!modelSubContainer) {
-        // 如果容器不存在，创建它
-        const container = document.createElement('div');
-        container.id = 'modelSubFilters';
-        container.className = 'sub-filters';
-        document.getElementById('subFilters').parentNode.insertBefore(
-            container, 
-            document.getElementById('subFilters').nextSibling
-        );
-    }
-    
-    const modelSubContainer2 = document.getElementById('modelSubFilters');
-    if (value && modelSubCategories[value]) {
-        renderModelSubFilters(value);
-        modelSubContainer2.classList.add('active');
+    currentFilters.modelSub = '';
+
+    const modelSubEl = document.getElementById('modelSubFilters');
+    const metadata = window.metadata || {};
+    const categories = modelSubCategories[value] || (metadata.modelSubCategories && metadata.modelSubCategories[value]);
+    if (value && categories) {
+        modelSubEl.innerHTML = Object.entries(categories).map(([key, label]) =>
+            `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="model">${label}</button>`
+        ).join('');
+        modelSubEl.classList.add('active');
+        modelSubEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'model'));
+        });
     } else {
-        modelSubContainer2.classList.remove('active');
+        modelSubEl.classList.remove('active');
+        modelSubEl.innerHTML = '';
     }
-    
     applyFilters();
 }
 
@@ -104,126 +182,61 @@ function handleSearchChange(e) {
     applyFilters();
 }
 
-// 渲染场景二级筛选器
-function renderSubFilters(scene, type) {
-    const subFiltersContainer = document.getElementById('subFilters');
-    const subScenes = metadata.subScenes[scene];
-    
-    if (!subScenes) return;
-    
-    subFiltersContainer.innerHTML = Object.entries(subScenes).map(([key, label]) => `
-        <div class="sub-filter-chip" data-value="${key}" onclick="handleSubFilterClick('${key}', 'scene')">
-            ${label}
-        </div>
-    `).join('');
-}
-
-// 新增：渲染商业模式二级筛选器
-function renderModelSubFilters(model) {
-    const container = document.getElementById('modelSubFilters');
-    const subCategories = modelSubCategories[model];
-    
-    if (!subCategories) return;
-    
-    container.innerHTML = `
-        <div style="padding: 10px 0; color: #666; font-size: 12px; font-weight: 600;">
-            💼 商业模式细分：
-        </div>
-    ` + Object.entries(subCategories).map(([key, label]) => `
-        <div class="sub-filter-chip" data-value="${key}" data-type="model" onclick="handleSubFilterClick('${key}', 'model')">
-            ${label}
-        </div>
-    `).join('');
-}
-
-// 修改：支持不同类型的二级筛选
-function handleSubFilterClick(value, type) {
-    if (type === 'scene') {
-        // 切换选中状态
-        if (currentFilters.subScene === value) {
-            currentFilters.subScene = '';
-        } else {
-            currentFilters.subScene = value;
-        }
-        
-        // 更新UI
-        document.querySelectorAll('#subFilters .sub-filter-chip').forEach(chip => {
-            if (chip.getAttribute('data-value') === currentFilters.subScene) {
-                chip.classList.add('active');
-            } else {
-                chip.classList.remove('active');
-            }
-        });
-    } else if (type === 'model') {
-        // 商业模式二级筛选
-        if (currentFilters.modelSub === value) {
-            currentFilters.modelSub = '';
-        } else {
-            currentFilters.modelSub = value;
-        }
-        
-        // 更新UI
-        document.querySelectorAll('#modelSubFilters .sub-filter-chip').forEach(chip => {
-            if (chip.getAttribute('data-value') === currentFilters.modelSub) {
-                chip.classList.add('active');
-            } else {
-                chip.classList.remove('active');
-            }
-        });
-    }
-    
-    applyFilters();
-}
-
 // 应用所有筛选条件
 function applyFilters() {
-    let filtered = [...allCompanies];
+    const allCompanies = window.allCompanies || [];
+    if (!allCompanies.length) {
+        console.warn('⚠️ allCompanies not ready yet');
+        return;
+    }
     
-    // 层级筛选
+    let filtered = [...allCompanies];
+
     if (currentFilters.layer) {
         filtered = filtered.filter(c => c.layer === currentFilters.layer);
     }
-    
-    // 场景筛选
-    if (currentFilters.scene) {
-        filtered = filtered.filter(c => c.scene === currentFilters.scene);
-    }
-    
-    // 二级场景筛选
-    if (currentFilters.subScene) {
+    // 非应用层：按层级细分（subScene）筛选
+    if (currentFilters.layer && currentFilters.layer !== 'application' && currentFilters.subScene) {
         filtered = filtered.filter(c => c.subScene === currentFilters.subScene);
     }
-    
-    // 地域筛选
+    // 应用层：按应用场景（scene）筛选
+    if (currentFilters.layer === 'application' && currentFilters.scene) {
+        filtered = filtered.filter(c => c.scene === currentFilters.scene);
+    }
+    // 应用层：按场景细分（subScene）筛选
+    if (currentFilters.layer === 'application' && currentFilters.subScene) {
+        filtered = filtered.filter(c => c.subScene === currentFilters.subScene);
+    }
+
     if (currentFilters.region) {
         filtered = filtered.filter(c => c.region === currentFilters.region);
     }
-    
-    // 商业模式筛选
     if (currentFilters.model) {
         filtered = filtered.filter(c => c.model === currentFilters.model);
     }
-    
-    // 新增：商业模式二级筛选
     if (currentFilters.modelSub) {
         filtered = filtered.filter(c => c.modelSub === currentFilters.modelSub);
     }
-    
-    // 搜索筛选
     if (currentFilters.search) {
-        filtered = filtered.filter(c => 
+        filtered = filtered.filter(c =>
             c.name.toLowerCase().includes(currentFilters.search) ||
-            c.nameEn.toLowerCase().includes(currentFilters.search) ||
+            (c.nameEn && c.nameEn.toLowerCase().includes(currentFilters.search)) ||
             c.description.toLowerCase().includes(currentFilters.search) ||
-            c.features.some(f => f.toLowerCase().includes(currentFilters.search))
+            (Array.isArray(c.features) ? c.features.some(f => String(f).toLowerCase().includes(currentFilters.search)) : (c.features && String(c.features).toLowerCase().includes(currentFilters.search)))
         );
     }
+
+    filtered = typeof window.sortCompanies === 'function' ? window.sortCompanies(filtered) : filtered;
+    window.companiesData = filtered;
+
+    if (typeof renderCompanies === 'function') {
+        renderCompanies(filtered);
+    } else {
+        console.error('❌ renderCompanies function not found');
+    }
     
-    // 更新显示
-    companiesData = filtered;
-    renderCompanies(filtered);
-    
-    // 更新统计
     document.getElementById('filteredCount').textContent = filtered.length;
-    updateStatistics();
+    if (typeof updateStatistics === 'function') {
+        updateStatistics();
+    }
 }

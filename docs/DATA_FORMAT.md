@@ -49,7 +49,8 @@
 | `website` | string | 官方网站 URL |
 | `github` | string | GitHub 地址 |
 | `highlight` | string | 核心亮点 (最多200字) |
-| `logo` | string | Logo (emoji或缩写) |
+| `logo` | string | Logo 文字缩写（无图时显示） |
+| `logoUrl` | string | Logo 图片 URL（优先于网站 favicon） |
 
 ## 枚举值
 

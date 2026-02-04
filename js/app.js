@@ -1,5 +1,41 @@
 // 核心应用逻辑
 
+/** 将 features 规范为数组（数据里可能是字符串） */
+function ensureFeaturesArray(features) {
+    if (Array.isArray(features)) return features;
+    if (features == null || features === '') return [];
+    return [String(features)];
+}
+
+/** 将 investors 规范为数组 */
+function ensureInvestorsArray(investors) {
+    if (Array.isArray(investors)) return investors;
+    if (investors == null || investors === '') return [];
+    return [String(investors)];
+}
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+/** 生成公司 Logo HTML：优先 logoUrl → 网站 favicon → 文字缩写 */
+function getCompanyLogoHtml(company) {
+    if (company.logoUrl) {
+        return `<img src="${company.logoUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><span class="logo-fallback" style="display:none;">${(company.logo || company.name || '').substring(0, 2)}</span>`;
+    }
+    if (company.website) {
+        try {
+            const domain = new URL(company.website).hostname.replace(/^www\./, '');
+            const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+            return `<img src="${faviconUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><span class="logo-fallback" style="display:none;">${(company.logo || company.name || '').substring(0, 2)}</span>`;
+        } catch (e) {}
+    }
+    return (company.logo || (company.name || '').substring(0, 2));
+}
+
 // 渲染公司卡片
 function renderCompanies(companies) {
     const container = document.getElementById('playersContainer');
@@ -17,7 +53,7 @@ function renderCompanies(companies) {
     container.innerHTML = companies.map(company => `
         <div class="player-card" onclick="showCompanyDetail(${company.id})">
             <div class="card-header">
-                <div class="company-logo">${company.logo || company.name.substring(0, 2)}</div>
+                <div class="company-logo">${getCompanyLogoHtml(company)}</div>
                 <div class="company-info">
                     <h3>${company.name}</h3>
                     <div class="company-name-en">${company.nameEn}</div>
@@ -25,7 +61,7 @@ function renderCompanies(companies) {
                         <span class="tag layer">${getLayerText(company.layer)}</span>
                         ${company.scene ? `<span class="tag scene">${getSceneText(company.scene)}</span>` : ''}
                         <span class="tag region">${getRegionText(company.region)}</span>
-                        <span class="tag model">${company.model.toUpperCase()}</span>
+                        <span class="tag model">${(company.model || '').toUpperCase()}</span>
                     </div>
                 </div>
             </div>
@@ -53,19 +89,19 @@ function showCompanyDetail(companyId) {
     if (!company) return;
     
     // 设置标题
-    document.getElementById('modalTitle').textContent = company.name;
-    document.getElementById('modalSubtitle').textContent = `${company.nameEn} | 成立于 ${company.founded}`;
+    document.getElementById('modalTitle').textContent = company.name || '';
+    document.getElementById('modalSubtitle').textContent = [company.nameEn, company.founded ? `成立于 ${company.founded}` : ''].filter(Boolean).join(' | ') || '—';
     
     // 概览标签
     document.getElementById('tab-overview').innerHTML = `
         <div class="detail-section">
             <h4>📝 公司简介</h4>
-            <p>${company.description}</p>
+            <p>${escapeHtml(company.description || '')}</p>
         </div>
         <div class="detail-section">
             <h4>✨ 核心功能</h4>
             <ul style="padding-left: 20px; line-height: 1.8;">
-                ${company.features.map(f => `<li>${f}</li>`).join('')}
+                ${ensureFeaturesArray(company.features).map(f => `<li>${escapeHtml(String(f))}</li>`).join('')}
             </ul>
         </div>
     `;
@@ -83,13 +119,13 @@ function showCompanyDetail(companyId) {
             </div>
             <div class="metric-card" style="background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center;">
                 <div style="font-size: 12px; color: #666; margin-bottom: 8px;">用户类型</div>
-                <div style="font-size: 16px; font-weight: 700; color: #1e3a5f;">${company.userType}</div>
+                <div style="font-size: 16px; font-weight: 700; color: #1e3a5f;">${escapeHtml(company.userType || '')}</div>
             </div>
         </div>
         <div class="detail-section" style="margin-top: 25px;">
             <h4>💰 定价信息</h4>
-            <p><strong>付费模式：</strong>${company.pricingModel}</p>
-            <p><strong>价格区间：</strong>${company.pricingRange}</p>
+            <p><strong>付费模式：</strong>${escapeHtml(company.pricingModel || '')}</p>
+            <p><strong>价格区间：</strong>${escapeHtml(company.pricingRange || '')}</p>
         </div>
     `;
     
@@ -103,18 +139,19 @@ function showCompanyDetail(companyId) {
                     <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0;">
                         <div style="font-size: 12px; color: #667eea; font-weight: 600; margin-bottom: 5px;">${round.date}</div>
                         <div style="font-weight: 600; color: #333; margin-bottom: 5px;">${round.round} - ${round.amount}</div>
-                        <div style="font-size: 13px; color: #666;">投资方：${round.investors.join(', ')}</div>
+                        <div style="font-size: 13px; color: #666;">投资方：${ensureInvestorsArray(round.investors).map(i => escapeHtml(String(i))).join(', ')}</div>
                     </div>
                 </div>
             `).join('')}
         </div>
     ` : '<p style="color: #999;">暂无融资信息</p>';
     
+    const investorsList = ensureInvestorsArray(company.investors);
     document.getElementById('tab-funding').innerHTML = `
         <div class="detail-section">
             <h4>💼 融资概况</h4>
-            <p><strong>总融资额：</strong>${company.funding}</p>
-            <p><strong>主要投资方：</strong>${company.investors.join(', ')}</p>
+            <p><strong>总融资额：</strong>${escapeHtml(company.funding || '')}</p>
+            <p><strong>主要投资方：</strong>${investorsList.map(i => escapeHtml(String(i))).join(', ')}</p>
         </div>
         <div class="detail-section">
             <h4>📅 融资历程</h4>

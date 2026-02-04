@@ -1,7 +1,41 @@
 // 数据加载模块
-let companiesData = [];
-let allCompanies = [];
-let metadata = {};
+// 使用 window 确保全局可访问
+window.companiesData = [];
+window.allCompanies = [];
+window.metadata = {};
+
+// 为了兼容旧代码，保留局部引用
+let companiesData = window.companiesData;
+let allCompanies = window.allCompanies;
+let metadata = window.metadata;
+
+const LAYER_ORDER = { infrastructure: 0, llm: 1, platform: 2, application: 3 };
+
+function parseARRValue(arrStr) {
+    if (arrStr == null || arrStr === '') return -1;
+    const str = String(arrStr).trim();
+    if (str === 'N/A') return -1;
+    const match = str.match(/\$?([\d.]+)([BMK]?)/);
+    if (!match) return -1;
+    let amount = parseFloat(match[1]);
+    const unit = (match[2] || '').toUpperCase();
+    if (unit === 'B') amount *= 1000;
+    else if (unit === 'K') amount /= 1000;
+    return amount;
+}
+
+/** 按技术栈层级 → ARR 降序 → 名称 排序，供全局使用 */
+window.sortCompanies = function sortCompanies(list) {
+    return [...list].sort((a, b) => {
+        const orderA = LAYER_ORDER[a.layer] ?? 99;
+        const orderB = LAYER_ORDER[b.layer] ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        const arrA = parseARRValue(a.arr);
+        const arrB = parseARRValue(b.arr);
+        if (arrA !== arrB) return arrB - arrA;
+        return (a.name || '').localeCompare(b.name || '', 'zh');
+    });
+};
 
 async function loadData() {
     try {
@@ -10,19 +44,26 @@ async function loadData() {
         const response = await fetch('data/companies.json');
         const data = await response.json();
         
-        companiesData = data.companies;
-        allCompanies = [...data.companies];
-        metadata = data.metadata;
+        window.allCompanies = allCompanies = window.sortCompanies(data.companies);
+        window.companiesData = companiesData = [...allCompanies];
+        window.metadata = metadata = data.metadata;
+        
+        console.log('✅ Data loaded:', {
+            totalCompanies: allCompanies.length,
+            hasMetadata: !!metadata.subScenes
+        });
         
         // 更新UI
-        document.getElementById('lastUpdate').textContent = data.lastUpdate;
-        document.getElementById('totalCount').textContent = data.totalCompanies || companiesData.length;
+        const lastEl = document.getElementById('lastUpdate');
+        if (lastEl) lastEl.textContent = data.lastUpdate;
         
         // 计算统计数据
         updateStatistics();
         
         // 渲染公司卡片
         renderCompanies(companiesData);
+        const countEl = document.getElementById('filteredCount');
+        if (countEl) countEl.textContent = companiesData.length;
         
         document.getElementById('loadingSpinner').classList.remove('active');
         
@@ -41,42 +82,8 @@ async function loadData() {
 }
 
 function updateStatistics() {
-    // 计算最高ARR
-    let maxARR = '$0';
-    let maxAmount = 0;
-    companiesData.forEach(company => {
-        if (company.arr && company.arr !== 'N/A') {
-            const match = company.arr.match(/\$?([\d.]+)([BMK]?)/);
-            if (match) {
-                let amount = parseFloat(match[1]);
-                const unit = match[2];
-                if (unit === 'B') amount *= 1000;
-                if (unit === 'K') amount /= 1000;
-                if (amount > maxAmount) {
-                    maxAmount = amount;
-                    maxARR = company.arr;
-                }
-            }
-        }
-    });
-    document.getElementById('maxARR').textContent = maxARR;
-    
-    // 计算总融资额
-    let totalFunding = 0;
-    companiesData.forEach(company => {
-        if (company.funding && company.funding !== 'N/A' && company.funding !== '未披露') {
-            const match = company.funding.match(/\$?([\d.]+)([BMK]?)/);
-            if (match) {
-                let amount = parseFloat(match[1]);
-                const unit = match[2];
-                if (unit === 'B') amount *= 1;
-                else if (unit === 'M') amount /= 1000;
-                else if (unit === 'K') amount /= 1000000;
-                totalFunding += amount;
-            }
-        }
-    });
-    document.getElementById('totalFunding').textContent = `$${totalFunding.toFixed(1)}B`;
+    const el = document.getElementById('filteredCount');
+    if (el) el.textContent = (window.companiesData || companiesData || []).length;
 }
 
 // 页面加载时执行
