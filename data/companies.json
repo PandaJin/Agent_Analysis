@@ -1,0 +1,183 @@
+{
+  "version": "1.0.0",
+  "lastUpdate": "2026-02-04",
+  "totalCompanies": 50,
+  "companies": [
+    {
+      "id": 1,
+      "name": "AWS",
+      "nameEn": "Amazon Web Services",
+      "layer": "infrastructure",
+      "scene": "",
+      "subScene": "cloud",
+      "region": "global",
+      "model": "2b",
+      "description": "全球最大云服务商，提供全栈AI Agent基础设施，包括Bedrock模型平台和SageMaker开发工具",
+      "features": ["GPU算力池", "Bedrock平台", "SageMaker", "Lambda无服务器"],
+      "arr": "$90B+",
+      "mau": "N/A",
+      "userType": "企业客户",
+      "pricingModel": "按使用量计费",
+      "pricingRange": "$0.01-10/hour",
+      "founded": "2006",
+      "funding": "N/A",
+      "investors": ["Amazon"],
+      "fundingRounds": [],
+      "website": "https://aws.amazon.com",
+      "github": "",
+      "highlight": "保姆式全栈托管，市场占有率40%+",
+      "logo": "AWS"
+    },
+    {
+      "id": 2,
+      "name": "腾讯云",
+      "nameEn": "Tencent Cloud",
+      "layer": "infrastructure",
+      "scene": "",
+      "subScene": "cloud",
+      "region": "china",
+      "model": "2b",
+      "description": "国内头部云服务商，深度布局AI Agent沙箱环境、私有化部署和安全合规方案",
+      "features": ["智算中心", "混元大模型", "安全沙箱", "专有云"],
+      "arr": "$8B+",
+      "mau": "N/A",
+      "userType": "企业客户",
+      "pricingModel": "订阅制+按量付费",
+      "pricingRange": "¥0.1-5/小时",
+      "founded": "2013",
+      "funding": "N/A",
+      "investors": ["腾讯"],
+      "fundingRounds": [],
+      "website": "https://cloud.tencent.com",
+      "github": "",
+      "highlight": "安全+成本+生态三位一体",
+      "logo": "腾讯"
+    },
+    {
+      "id": 3,
+      "name": "火山引擎",
+      "nameEn": "Volcano Engine",
+      "layer": "infrastructure",
+      "scene": "",
+      "subScene": "cloud",
+      "region": "china",
+      "model": "2b",
+      "description": "字节跳动云服务，通过Coze平台免费策略引流GPU销量，口碑业界领先",
+      "features": ["豆包大模型", "Coze平台", "高性能GPU", "智能推荐"],
+      "arr": "$3B+",
+      "mau": "N/A",
+      "userType": "开发者+企业",
+      "pricingModel": "Coze免费+算力付费",
+      "pricingRange": "¥0.5-8/小时",
+      "founded": "2021",
+      "funding": "N/A",
+      "investors": ["字节跳动"],
+      "fundingRounds": [],
+      "website": "https://www.volcengine.com",
+      "github": "",
+      "highlight": "Coze口碑业界第一，免费引流策略",
+      "logo": "火山"
+    },
+    {
+      "id": 10,
+      "name": "OpenAI",
+      "nameEn": "OpenAI",
+      "layer": "llm",
+      "scene": "",
+      "subScene": "closed",
+      "region": "global",
+      "model": "2b2c",
+      "description": "GPT系列领导者，定义AI Agent时代技术标准，推出AGENTS.md规范",
+      "features": ["GPT-4", "o1推理模型", "AGENTS.md", "Function Calling"],
+      "arr": "$3.4B+",
+      "mau": "300M+",
+      "userType": "开发者+企业+消费者",
+      "pricingModel": "API按token+订阅",
+      "pricingRange": "$20-200/月 + API",
+      "founded": "2015",
+      "funding": "$13.5B",
+      "investors": ["Microsoft", "Sequoia", "Thrive Capital", "Tiger Global"],
+      "fundingRounds": [
+        {"date": "2023-01", "round": "投资", "amount": "$10B", "investors": ["Microsoft"]},
+        {"date": "2024-10", "round": "融资", "amount": "$6.6B", "investors": ["Thrive Capital", "Softbank"]}
+      ],
+      "website": "https://openai.com",
+      "github": "https://github.com/openai",
+      "highlight": "技术与生态双引擎，年收入$3.4B+",
+      "logo": "OAI"
+    },
+    {
+      "id": 11,
+      "name": "Anthropic",
+      "nameEn": "Anthropic",
+      "layer": "llm",
+      "scene": "",
+      "subScene": "closed",
+      "region": "global",
+      "model": "2b2c",
+      "description": "Claude系列开发者，推出MCP协议统一工具调用，Constitutional AI安全理念",
+      "features": ["Claude 4.5", "MCP协议", "Constitutional AI", "200K上下文"],
+      "arr": "$900M+",
+      "mau": "50M+",
+      "userType": "开发者+企业+专业用户",
+      "pricingModel": "API+订阅",
+      "pricingRange": "$20-200/月 + API",
+      "founded": "2021",
+      "funding": "$7.3B",
+      "investors": ["Google", "Salesforce", "Spark Capital", "Menlo Ventures"],
+      "fundingRounds": [
+        {"date": "2023-05", "round": "C轮", "amount": "$450M", "investors": ["Spark Capital"]},
+        {"date": "2023-09", "round": "投资", "amount": "$2B", "investors": ["Google"]},
+        {"date": "2024-03", "round": "投资", "amount": "$4B", "investors": ["Amazon"]}
+      ],
+      "website": "https://anthropic.com",
+      "github": "https://github.com/anthropics",
+      "highlight": "安全可控Agent能力，MCP生态领导者",
+      "logo": "🤖"
+    }
+  ],
+  "metadata": {
+    "categories": {
+      "layers": ["infrastructure", "llm", "platform", "application"],
+      "scenes": ["general", "horizontal", "function", "vertical"],
+      "regions": ["china", "overseas", "global"],
+      "models": ["2b", "2c", "2b2c"]
+    },
+    "subScenes": {
+      "horizontal": {
+        "coding": "AI Coding",
+        "design": "设计创作",
+        "video": "视频创作",
+        "translation": "翻译",
+        "writing": "写作助手"
+      },
+      "function": {
+        "customer-service": "智能客服",
+        "marketing": "营销推广",
+        "sales": "销售自动化",
+        "hr": "招聘HR"
+      },
+      "vertical": {
+        "legal": "法律",
+        "healthcare": "医疗",
+        "finance": "金融投研",
+        "education": "教育",
+        "supply-chain": "供应链"
+      },
+      "infrastructure": {
+        "cloud": "云服务",
+        "gpu": "GPU/算力",
+        "storage": "存储"
+      },
+      "llm": {
+        "closed": "闭源模型",
+        "open": "开源模型"
+      },
+      "platform": {
+        "nocode": "No-Code平台",
+        "framework": "开发框架",
+        "tools": "开发工具"
+      }
+    }
+  }
+}

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent 生态玩家地图</title>
+    <meta name="description" content="追踪全球 120+ AI Agent 产业链核心玩家">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- 导出库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <h1>🤖 AI Agent 生态玩家地图</h1>
+                <p class="subtitle">追踪全球 120+ AI Agent 产业链核心玩家 | 最后更新：<span id="lastUpdate">加载中...</span></p>
+            </div>
+            <div class="header-right">
+                <button class="export-btn" id="exportExcel">📊 导出 Excel</button>
+                <button class="export-btn" id="exportPDF">📄 导出 PDF</button>
+                <a href="https://github.com/PandaJin/Agent_Analysis" target="_blank" class="github-link">
+                    <svg height="24" width="24" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </header>
+
+        <div class="filters">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <label>🏗️ 技术栈层级</label>
+                    <select id="layerFilter">
+                        <option value="">全部层级</option>
+                        <option value="infrastructure">基础设施层</option>
+                        <option value="llm">大模型层</option>
+                        <option value="platform">平台/框架层</option>
+                        <option value="application">应用层</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>🎯 应用场景</label>
+                    <select id="sceneFilter">
+                        <option value="">全部场景</option>
+                        <option value="general">通用场景</option>
+                        <option value="horizontal">水平场景</option>
+                        <option value="function">行业职能</option>
+                        <option value="vertical">行业垂直</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>🌍 地域分布</label>
+                    <select id="regionFilter">
+                        <option value="">全部地区</option>
+                        <option value="china">国内</option>
+                        <option value="overseas">出海</option>
+                        <option value="global">海外</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>💼 商业模式</label>
+                    <select id="modelFilter">
+                        <option value="">全部模式</option>
+                        <option value="2c">2C</option>
+                        <option value="2b">2B</option>
+                        <option value="2b2c">2B2C</option>
+                    </select>
+                </div>
+
+                <div class="filter-group search-box">
+                    <label>🔍 搜索</label>
+                    <input type="text" id="searchInput" placeholder="公司名称、产品、关键词...">
+                </div>
+            </div>
+
+            <!-- 二级筛选器 -->
+            <div id="subFilters" class="sub-filters"></div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-icon blue">🏢</div>
+                <div class="stat-text">
+                    <span class="stat-label">总公司数</span>
+                    <span class="stat-value" id="totalCount">0</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon green">✅</div>
+                <div class="stat-text">
+                    <span class="stat-label">筛选结果</span>
+                    <span class="stat-value" id="filteredCount">0</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon orange">🔥</div>
+                <div class="stat-text">
+                    <span class="stat-label">最高 ARR</span>
+                    <span class="stat-value" id="maxARR">加载中...</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon purple">💰</div>
+                <div class="stat-text">
+                    <span class="stat-label">总融资额</span>
+                    <span class="stat-value" id="totalFunding">加载中...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="view-toggle">
+                <button class="view-btn active">📊 卡片视图</button>
+            </div>
+
+            <div class="spinner" id="loadingSpinner"></div>
+            <div id="playersContainer" class="cards-grid"></div>
+        </div>
+    </div>
+
+    <!-- 详情模态框 -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <h2 class="modal-title" id="modalTitle"></h2>
+                    <p class="modal-subtitle" id="modalSubtitle"></p>
+                </div>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            
+            <div class="detail-tabs">
+                <button class="detail-tab active" data-tab="overview">📋 概览</button>
+                <button class="detail-tab" data-tab="business">💼 商业信息</button>
+                <button class="detail-tab" data-tab="funding">💰 融资历程</button>
+                <button class="detail-tab" data-tab="links">🔗 相关链接</button>
+            </div>
+
+            <div id="modalBody">
+                <div class="tab-content active" id="tab-overview"></div>
+                <div class="tab-content" id="tab-business"></div>
+                <div class="tab-content" id="tab-funding"></div>
+                <div class="tab-content" id="tab-links"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/data-loader.js"></script>
+    <script src="js/filters.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
