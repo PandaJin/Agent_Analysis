@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>AI Agent 生态玩家地图</title>
+    <meta name="description" content="追踪全球 120+ AI Agent 产业链核心玩家">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="header-left">
+                <h1>🤖 AI Agent 生态玩家地图</h1>
+                <p class="subtitle">追踪全球 120+ AI Agent 产业链核心玩家 | 最后更新：<span id="lastUpdate">加载中...</span></p>
+            </div>
+            <div class="header-right">
+                <button class="export-btn" id="exportExcel">📊 导出 Excel</button>
+                <button class="export-btn" id="exportPDF">📄 导出 PDF</button>
+                <a href="https://github.com/PandaJin/Agent_Analysis" target="_blank" class="github-link" aria-label="GitHub">
+                    <svg height="24" width="24" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                    <span class="github-text">GitHub</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- 搜索：最上方通栏 -->
+        <section class="search-section" aria-label="搜索">
+            <div class="search-wrap">
+                <label for="searchInput" class="search-label">🔍 搜索</label>
+                <input type="search" id="searchInput" class="search-input" placeholder="公司名称、产品、关键词..." autocomplete="off" aria-label="搜索公司">
+            </div>
+        </section>
+
+        <!-- 筛选区：技术栈 Tab + 地域/模式 + 筛选结果 -->
+        <section class="filters" aria-label="筛选">
+            <div class="filters-main">
+                <div class="layer-tabs-wrap">
+                    <span class="layer-tabs-label">技术栈</span>
+                    <div class="layer-tabs" role="tablist">
+                        <button type="button" class="layer-tab active" data-layer="" role="tab" aria-selected="true">全部</button>
+                        <button type="button" class="layer-tab" data-layer="infrastructure" role="tab">基础设施</button>
+                        <button type="button" class="layer-tab" data-layer="llm" role="tab">大模型</button>
+                        <button type="button" class="layer-tab" data-layer="platform" role="tab">平台/框架</button>
+                        <button type="button" class="layer-tab" data-layer="application" role="tab">应用层</button>
+                    </div>
+                </div>
+                <div class="filters-row">
+                    <div class="filter-group">
+                        <label for="regionFilter">🌍 地域</label>
+                        <select id="regionFilter" aria-label="地域筛选">
+                            <option value="">全部地区</option>
+                            <option value="china">国内</option>
+                            <option value="overseas">出海</option>
+                            <option value="global">海外</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="modelFilter">💼 模式</label>
+                        <select id="modelFilter" aria-label="商业模式筛选">
+                            <option value="">全部模式</option>
+                            <option value="2c">2C</option>
+                            <option value="2b">2B</option>
+                            <option value="2b2c">2B2C</option>
+                        </select>
+                    </div>
+                    <div class="filter-result">
+                        <span class="filter-result-label">筛选结果</span>
+                        <span id="filteredCount" class="filter-result-count">0</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 单行 chip：层级/场景细分 -->
+            <div id="subFilters" class="chip-row" aria-label="层级或场景细分"></div>
+            <div id="sceneSubFilters" class="chip-row" aria-label="场景细分"></div>
+            <div id="modelSubFilters" class="chip-row" aria-label="商业模式细分"></div>
+        </section>
+
+        <main class="content">
+            <div class="spinner" id="loadingSpinner"></div>
+            <div id="playersContainer" class="cards-grid"></div>
+        </main>
+    </div>
+
+    <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <h2 class="modal-title" id="modalTitle"></h2>
+                    <p class="modal-subtitle" id="modalSubtitle"></p>
+                </div>
+                <button type="button" class="close-btn" onclick="closeModal()" aria-label="关闭">&times;</button>
+            </div>
+            <div class="detail-tabs">
+                <button type="button" class="detail-tab active" data-tab="overview">📋 概览</button>
+                <button type="button" class="detail-tab" data-tab="business">💼 商业信息</button>
+                <button type="button" class="detail-tab" data-tab="funding">💰 融资历程</button>
+                <button type="button" class="detail-tab" data-tab="links">🔗 相关链接</button>
+            </div>
+            <div id="modalBody">
+                <div class="tab-content active" id="tab-overview"></div>
+                <div class="tab-content" id="tab-business"></div>
+                <div class="tab-content" id="tab-funding"></div>
+                <div class="tab-content" id="tab-links"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/data-loader.js"></script>
+    <script src="js/filters.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

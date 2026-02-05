@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "lastUpdate": "2026-02-04",
+  "totalCompanies": 50,
+  "dataNote": "这是包含50家核心公司的示例数据，完整版本请运行 scripts/generate_full_data.py 生成120+家公司数据",
+  "companies": []
+}
