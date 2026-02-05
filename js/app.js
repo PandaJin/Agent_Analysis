@@ -1,44 +1,19 @@
 // 核心应用逻辑
-
-/** 将 features 规范为数组（数据里可能是字符串） */
-function ensureFeaturesArray(features) {
-    if (Array.isArray(features)) return features;
-    if (features == null || features === '') return [];
-    return [String(features)];
-}
-
-/** 将 investors 规范为数组 */
-function ensureInvestorsArray(investors) {
-    if (Array.isArray(investors)) return investors;
-    if (investors == null || investors === '') return [];
-    return [String(investors)];
-}
-
-function escapeHtml(str) {
-    if (str == null) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-/** 生成公司 Logo HTML：优先 logoUrl → 网站 favicon → 文字缩写 */
-function getCompanyLogoHtml(company) {
-    if (company.logoUrl) {
-        return `<img src="${company.logoUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><span class="logo-fallback" style="display:none;">${(company.logo || company.name || '').substring(0, 2)}</span>`;
-    }
-    if (company.website) {
-        try {
-            const domain = new URL(company.website).hostname.replace(/^www\./, '');
-            const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
-            return `<img src="${faviconUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><span class="logo-fallback" style="display:none;">${(company.logo || company.name || '').substring(0, 2)}</span>`;
-        } catch (e) {}
-    }
-    return (company.logo || (company.name || '').substring(0, 2));
-}
+import {
+    ensureFeaturesArray,
+    ensureInvestorsArray,
+    escapeHtml,
+    getCompanyLogoHtml,
+    getLayerText,
+    getSceneText,
+    getRegionText
+} from './utils.js';
+import { getMetadata } from './data-loader.js';
 
 // 渲染公司卡片
-function renderCompanies(companies) {
+export function renderCompanies(companies) {
     const container = document.getElementById('playersContainer');
+    const metadata = getMetadata();
     
     if (!companies || companies.length === 0) {
         container.innerHTML = `
@@ -51,16 +26,16 @@ function renderCompanies(companies) {
     }
     
     container.innerHTML = companies.map(company => `
-        <div class="player-card" onclick="showCompanyDetail(${company.id})">
+        <div class="player-card" onclick="window.app.showCompanyDetail(${company.id}, window.app.getAllCompanies())">
             <div class="card-header">
                 <div class="company-logo">${getCompanyLogoHtml(company)}</div>
                 <div class="company-info">
                     <h3>${company.name}</h3>
                     <div class="company-name-en">${company.nameEn}</div>
                     <div class="tags">
-                        <span class="tag layer">${getLayerText(company.layer)}</span>
-                        ${company.scene ? `<span class="tag scene">${getSceneText(company.scene)}</span>` : ''}
-                        <span class="tag region">${getRegionText(company.region)}</span>
+                        <span class="tag layer">${getLayerText(company.layer, metadata)}</span>
+                        ${company.scene ? `<span class="tag scene">${getSceneText(company.scene, metadata)}</span>` : ''}
+                        <span class="tag region">${getRegionText(company.region, metadata)}</span>
                         <span class="tag model">${(company.model || '').toUpperCase()}</span>
                     </div>
                 </div>
@@ -84,15 +59,16 @@ function renderCompanies(companies) {
 }
 
 // 显示公司详情
-function showCompanyDetail(companyId) {
+export function showCompanyDetail(companyId, allCompanies) {
     const company = allCompanies.find(c => c.id === companyId);
     if (!company) return;
     
-    // 设置标题
+    const metadata = getMetadata(); // Get metadata here as well
+    // Set title
     document.getElementById('modalTitle').textContent = company.name || '';
     document.getElementById('modalSubtitle').textContent = [company.nameEn, company.founded ? `成立于 ${company.founded}` : ''].filter(Boolean).join(' | ') || '—';
     
-    // 概览标签
+    // Overview tab
     document.getElementById('tab-overview').innerHTML = `
         <div class="detail-section">
             <h4>📝 公司简介</h4>
@@ -100,51 +76,49 @@ function showCompanyDetail(companyId) {
         </div>
         <div class="detail-section">
             <h4>✨ 核心功能</h4>
-            <ul style="padding-left: 20px; line-height: 1.8;">
+            <ul class="detail-feature-list">
                 ${ensureFeaturesArray(company.features).map(f => `<li>${escapeHtml(String(f))}</li>`).join('')}
             </ul>
         </div>
     `;
     
-    // 商业信息标签
+    // Business info tab
     document.getElementById('tab-business').innerHTML = `
-        <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
-            <div class="metric-card" style="background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px;">ARR</div>
-                <div style="font-size: 24px; font-weight: 700; color: #1e3a5f;">${company.arr}</div>
+        <div class="metrics-grid-detail">
+            <div class="metric-card-detail">
+                <div class="label">ARR</div>
+                <div class="value">${company.arr}</div>
             </div>
-            <div class="metric-card" style="background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px;">MAU</div>
-                <div style="font-size: 24px; font-weight: 700; color: #1e3a5f;">${company.mau}</div>
+            <div class="metric-card-detail">
+                <div class="label">MAU</div>
+                <div class="value">${company.mau}</div>
             </div>
-            <div class="metric-card" style="background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px;">用户类型</div>
-                <div style="font-size: 16px; font-weight: 700; color: #1e3a5f;">${escapeHtml(company.userType || '')}</div>
+            <div class="metric-card-detail user-type">
+                <div class="label">用户类型</div>
+                <div class="value">${escapeHtml(company.userType || '')}</div>
             </div>
         </div>
-        <div class="detail-section" style="margin-top: 25px;">
+        <div class="detail-section detail-info-section">
             <h4>💰 定价信息</h4>
             <p><strong>付费模式：</strong>${escapeHtml(company.pricingModel || '')}</p>
             <p><strong>价格区间：</strong>${escapeHtml(company.pricingRange || '')}</p>
         </div>
     `;
     
-    // 融资历程标签
+    // Funding history tab
     const fundingHTML = company.fundingRounds && company.fundingRounds.length > 0 ? `
-        <div class="timeline" style="position: relative; padding-left: 30px;">
-            <div style="position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: #e0e0e0;"></div>
+        <div class="timeline">
             ${company.fundingRounds.map(round => `
-                <div class="timeline-item" style="position: relative; margin-bottom: 25px;">
-                    <div style="position: absolute; left: -24px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #667eea; border: 3px solid white; box-shadow: 0 0 0 2px #667eea;"></div>
-                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0;">
-                        <div style="font-size: 12px; color: #667eea; font-weight: 600; margin-bottom: 5px;">${round.date}</div>
-                        <div style="font-weight: 600; color: #333; margin-bottom: 5px;">${round.round} - ${round.amount}</div>
-                        <div style="font-size: 13px; color: #666;">投资方：${ensureInvestorsArray(round.investors).map(i => escapeHtml(String(i))).join(', ')}</div>
+                <div class="timeline-item">
+                    <div class="timeline-item-content">
+                        <div class="timeline-item-date">${round.date}</div>
+                        <div class="timeline-item-round-amount">${round.round} - ${round.amount}</div>
+                        <div class="timeline-item-investors">投资方：${ensureInvestorsArray(round.investors).map(i => escapeHtml(String(i))).join(', ')}</div>
                     </div>
                 </div>
             `).join('')}
         </div>
-    ` : '<p style="color: #999;">暂无融资信息</p>';
+    ` : '<p class="text-light">暂无融资信息</p>';
     
     const investorsList = ensureInvestorsArray(company.investors);
     document.getElementById('tab-funding').innerHTML = `
@@ -159,40 +133,40 @@ function showCompanyDetail(companyId) {
         </div>
     `;
     
-    // 相关链接标签
+    // Related links tab
     document.getElementById('tab-links').innerHTML = `
-        <div class="links-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <div class="links-grid-detail">
             ${company.website ? `
-                <a href="${company.website}" target="_blank" class="link-card" style="display: flex; align-items: center; gap: 12px; padding: 15px; background: #f8f9fa; border-radius: 10px; text-decoration: none; color: inherit; transition: all 0.3s; border: 2px solid transparent;">
-                    <div style="width: 40px; height: 40px; border-radius: 8px; background: white; display: flex; align-items: center; justify-content: center; font-size: 20px;">🌐</div>
+                <a href="${company.website}" target="_blank" class="link-card-detail">
+                    <div class="icon">🌐</div>
                     <div>
-                        <h5 style="font-size: 14px; color: #333; margin-bottom: 3px;">官方网站</h5>
-                        <p style="font-size: 11px; color: #999;">访问主页</p>
+                        <h5 class="title">官方网站</h5>
+                        <p class="description">访问主页</p>
                     </div>
                 </a>
             ` : ''}
             ${company.github ? `
-                <a href="${company.github}" target="_blank" class="link-card" style="display: flex; align-items: center; gap: 12px; padding: 15px; background: #f8f9fa; border-radius: 10px; text-decoration: none; color: inherit; transition: all 0.3s; border: 2px solid transparent;">
-                    <div style="width: 40px; height: 40px; border-radius: 8px; background: white; display: flex; align-items: center; justify-content: center; font-size: 20px;">💻</div>
+                <a href="${company.github}" target="_blank" class="link-card-detail">
+                    <div class="icon">💻</div>
                     <div>
-                        <h5 style="font-size: 14px; color: #333; margin-bottom: 3px;">GitHub</h5>
-                        <p style="font-size: 11px; color: #999;">查看源码</p>
+                        <h5 class="title">GitHub</h5>
+                        <p class="description">查看源码</p>
                     </div>
                 </a>
             ` : ''}
         </div>
     `;
     
-    // 显示模态框
+    // Show modal
     document.getElementById('detailModal').classList.add('active');
 }
 
-// 关闭模态框
-function closeModal() {
+// Close modal
+export function closeModal() {
     document.getElementById('detailModal').classList.remove('active');
 }
 
-// 模态框标签切换
+// Modal tab switching
 document.querySelectorAll('.detail-tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
@@ -204,39 +178,9 @@ document.querySelectorAll('.detail-tab').forEach(tab => {
     });
 });
 
-// 点击模态框外部关闭
+// Close modal when clicking outside
 document.getElementById('detailModal').addEventListener('click', (e) => {
     if (e.target.id === 'detailModal') {
         closeModal();
     }
 });
-
-// 辅助函数
-function getLayerText(layer) {
-    const map = {
-        'infrastructure': '基础设施',
-        'llm': '大模型',
-        'platform': '平台框架',
-        'application': '应用'
-    };
-    return map[layer] || layer;
-}
-
-function getSceneText(scene) {
-    const map = {
-        'general': '通用',
-        'horizontal': '水平场景',
-        'function': '行业职能',
-        'vertical': '行业垂直'
-    };
-    return map[scene] || scene;
-}
-
-function getRegionText(region) {
-    const map = {
-        'china': '国内',
-        'overseas': '出海',
-        'global': '海外'
-    };
-    return map[region] || region;
-}

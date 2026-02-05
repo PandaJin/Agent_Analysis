@@ -1,5 +1,6 @@
-// 筛选功能模块 - v3.0
-// 第一级：技术栈 → 第二级：层级细分/应用场景 → 第三级：仅应用场景细分
+// 筛选功能模块
+import { getMetadata, getAllCompanies, getCompaniesData, setCompaniesData } from './data-loader.js';
+import { getLayerText, getSceneText, getRegionText, sortCompanies } from './utils.js';
 
 let currentFilters = {
     layer: '',
@@ -11,45 +12,18 @@ let currentFilters = {
     search: ''
 };
 
-// 应用场景（仅应用层时在第二级展示）的选项
-const sceneLabels = {
-    'general': '通用场景',
-    'horizontal': '水平场景',
-    'function': '行业职能',
-    'vertical': '行业垂直'
-};
-
-// 商业模式二级分类（与 metadata 一致，可后续改为从 metadata 读取）
-const modelSubCategories = {
-    '2b': {
-        'saas': 'SaaS订阅',
-        'private': '私有化部署',
-        'api': 'API调用计费',
-        'project': '项目制咨询',
-        'platform': '平台授权'
-    },
-    '2c': {
-        'freemium': '免费+会员',
-        'subscription': '订阅制',
-        'ads': '广告模式',
-        'iap': '应用内购买'
-    },
-    '2b2c': {
-        'hybrid': '混合订阅',
-        'platform': '平台抽成',
-        'ecosystem': '生态分成'
-    }
-};
-
-// 初始化筛选器
-document.addEventListener('DOMContentLoaded', () => {
+// Function to initialize filters and set up event listeners
+export function initializeFilters() {
     document.querySelectorAll('.layer-tab').forEach(btn => {
         btn.addEventListener('click', () => setLayer(btn.dataset.layer || ''));
     });
     document.getElementById('regionFilter').addEventListener('change', handleFilterChange);
     document.getElementById('modelFilter').addEventListener('change', handleModelChange);
     document.getElementById('searchInput').addEventListener('input', handleSearchChange);
-});
+
+    // Initial application of filters after data load
+    applyFilters();
+}
 
 function handleFilterChange(e) {
     const filterId = e.target.id;
@@ -60,7 +34,7 @@ function handleFilterChange(e) {
 }
 
 function setLayer(value) {
-    const metadata = window.metadata || {};
+    const metadata = getMetadata();
     currentFilters.layer = value;
     currentFilters.scene = '';
     currentFilters.subScene = '';
@@ -82,6 +56,9 @@ function setLayer(value) {
         return;
     }
 
+    const sceneLabels = metadata.sceneLabels || {};
+    const subScenesConfig = metadata.subScenes || {};
+
     if (value === 'application') {
         subFiltersEl.innerHTML = Object.entries(sceneLabels).map(([key, label]) =>
             `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="scene">${label}</button>`
@@ -90,8 +67,8 @@ function setLayer(value) {
         subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
             chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'scene'));
         });
-    } else if (metadata.subScenes && metadata.subScenes[value]) {
-        const subScenes = metadata.subScenes[value];
+    } else if (subScenesConfig[value]) {
+        const subScenes = subScenesConfig[value];
         subFiltersEl.innerHTML = Object.entries(subScenes).map(([key, label]) =>
             `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="layerSub">${label}</button>`
         ).join('');
@@ -109,25 +86,30 @@ function setLayer(value) {
 function handleSubFilterClick(value, type) {
     const subFiltersEl = document.getElementById('subFilters');
     const sceneSubFiltersEl = document.getElementById('sceneSubFilters');
+    const metadata = getMetadata();
+    const subScenesConfig = metadata.subScenes || {};
+
+    // Helper to toggle active class
+    const toggleActiveClass = (element, dataValue) => {
+        element.querySelectorAll('.sub-filter-chip').forEach(chip => {
+            chip.classList.toggle('active', chip.getAttribute('data-value') === dataValue);
+        });
+    };
 
     if (type === 'layerSub') {
         currentFilters.scene = '';
         currentFilters.subScene = currentFilters.subScene === value ? '' : value;
         sceneSubFiltersEl.classList.remove('active');
         sceneSubFiltersEl.innerHTML = '';
-        subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
-            chip.classList.toggle('active', chip.getAttribute('data-value') === currentFilters.subScene);
-        });
+        toggleActiveClass(subFiltersEl, currentFilters.subScene);
     } else if (type === 'scene') {
         currentFilters.subScene = '';
         currentFilters.scene = currentFilters.scene === value ? '' : value;
-        subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
-            chip.classList.toggle('active', chip.getAttribute('data-value') === currentFilters.scene);
-        });
-        // 第三级：仅当应用层且选了有细分的场景时展示
-        const metadata = window.metadata || {};
-        if (currentFilters.scene && metadata.subScenes && metadata.subScenes[currentFilters.scene]) {
-            const subScenes = metadata.subScenes[currentFilters.scene];
+        toggleActiveClass(subFiltersEl, currentFilters.scene);
+        
+        // Third level: only show when application layer and a scene with sub-scenes is selected
+        if (currentFilters.scene && subScenesConfig[currentFilters.scene]) {
+            const subScenes = subScenesConfig[currentFilters.scene];
             sceneSubFiltersEl.innerHTML = Object.entries(subScenes).map(([key, label]) =>
                 `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="sceneSub">${label}</button>`
             ).join('');
@@ -141,14 +123,10 @@ function handleSubFilterClick(value, type) {
         }
     } else if (type === 'sceneSub') {
         currentFilters.subScene = currentFilters.subScene === value ? '' : value;
-        sceneSubFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
-            chip.classList.toggle('active', chip.getAttribute('data-value') === currentFilters.subScene);
-        });
+        toggleActiveClass(sceneSubFiltersEl, currentFilters.subScene);
     } else if (type === 'model') {
         currentFilters.modelSub = currentFilters.modelSub === value ? '' : value;
-        document.querySelectorAll('#modelSubFilters .sub-filter-chip').forEach(chip => {
-            chip.classList.toggle('active', chip.getAttribute('data-value') === currentFilters.modelSub);
-        });
+        toggleActiveClass(document.getElementById('modelSubFilters'), currentFilters.modelSub);
     }
 
     applyFilters();
@@ -160,8 +138,10 @@ function handleModelChange(e) {
     currentFilters.modelSub = '';
 
     const modelSubEl = document.getElementById('modelSubFilters');
-    const metadata = window.metadata || {};
-    const categories = modelSubCategories[value] || (metadata.modelSubCategories && metadata.modelSubCategories[value]);
+    const metadata = getMetadata();
+    const modelSubCategoriesConfig = metadata.modelSubCategories || {};
+    const categories = modelSubCategoriesConfig[value]; // Directly use from metadata
+
     if (value && categories) {
         modelSubEl.innerHTML = Object.entries(categories).map(([key, label]) =>
             `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="model">${label}</button>`
@@ -182,61 +162,90 @@ function handleSearchChange(e) {
     applyFilters();
 }
 
-// 应用所有筛选条件
-function applyFilters() {
-    const allCompanies = window.allCompanies || [];
+// Apply all filter conditions
+export function applyFilters() {
+    const allCompanies = getAllCompanies();
     if (!allCompanies.length) {
         console.warn('⚠️ allCompanies not ready yet');
         return;
     }
     
-    let filtered = [...allCompanies];
+    let filtered = allCompanies.filter(company => {
+        // Layer filter
+        if (currentFilters.layer && company.layer !== currentFilters.layer) {
+            return false;
+        }
 
-    if (currentFilters.layer) {
-        filtered = filtered.filter(c => c.layer === currentFilters.layer);
-    }
-    // 非应用层：按层级细分（subScene）筛选
-    if (currentFilters.layer && currentFilters.layer !== 'application' && currentFilters.subScene) {
-        filtered = filtered.filter(c => c.subScene === currentFilters.subScene);
-    }
-    // 应用层：按应用场景（scene）筛选
-    if (currentFilters.layer === 'application' && currentFilters.scene) {
-        filtered = filtered.filter(c => c.scene === currentFilters.scene);
-    }
-    // 应用层：按场景细分（subScene）筛选
-    if (currentFilters.layer === 'application' && currentFilters.subScene) {
-        filtered = filtered.filter(c => c.subScene === currentFilters.subScene);
-    }
+        // Sub-scene filter (depends on layer)
+        if (currentFilters.layer && currentFilters.subScene) {
+            // For application layer, subScene is a specific sub-category within a scene
+            // For other layers, subScene is a direct sub-category of the layer
+            if (company.layer === 'application') {
+                 // Check if the company's scene matches the current scene filter, 
+                 // AND if its subScene matches the current subScene filter.
+                 // This assumes metadata defines subScenes nested under primary scenes.
+                 // The current implementation in setLayer and handleSubFilterClick implies
+                 // that currentFilters.subScene is a sub-category directly.
+                 // Need to re-evaluate metadata structure to ensure this logic is correct.
+                 // For now, assuming company.subScene directly holds the selected sub-scene value.
+                if (currentFilters.scene && company.scene !== currentFilters.scene) return false;
+                if (company.subScene !== currentFilters.subScene) return false;
 
-    if (currentFilters.region) {
-        filtered = filtered.filter(c => c.region === currentFilters.region);
-    }
-    if (currentFilters.model) {
-        filtered = filtered.filter(c => c.model === currentFilters.model);
-    }
-    if (currentFilters.modelSub) {
-        filtered = filtered.filter(c => c.modelSub === currentFilters.modelSub);
-    }
-    if (currentFilters.search) {
-        filtered = filtered.filter(c =>
-            c.name.toLowerCase().includes(currentFilters.search) ||
-            (c.nameEn && c.nameEn.toLowerCase().includes(currentFilters.search)) ||
-            c.description.toLowerCase().includes(currentFilters.search) ||
-            (Array.isArray(c.features) ? c.features.some(f => String(f).toLowerCase().includes(currentFilters.search)) : (c.features && String(c.features).toLowerCase().includes(currentFilters.search)))
-        );
-    }
+            } else {
+                if (company.subScene !== currentFilters.subScene) return false;
+            }
+        } else if (currentFilters.layer === 'application' && currentFilters.scene && company.scene !== currentFilters.scene) {
+            // If application layer and only scene is selected (no sub-scene)
+            return false;
+        }
 
-    filtered = typeof window.sortCompanies === 'function' ? window.sortCompanies(filtered) : filtered;
-    window.companiesData = filtered;
 
-    if (typeof renderCompanies === 'function') {
-        renderCompanies(filtered);
+        // Region filter
+        if (currentFilters.region && company.region !== currentFilters.region) {
+            return false;
+        }
+
+        // Model filter
+        if (currentFilters.model && company.model !== currentFilters.model) {
+            return false;
+        }
+
+        // Model sub-category filter
+        if (currentFilters.modelSub && company.modelSub !== currentFilters.modelSub) {
+            return false;
+        }
+
+        // Search filter
+        if (currentFilters.search) {
+            const searchTerm = currentFilters.search;
+            const features = Array.isArray(company.features) ? company.features : [company.features];
+            
+            const matches = 
+                (company.name && company.name.toLowerCase().includes(searchTerm)) ||
+                (company.nameEn && company.nameEn.toLowerCase().includes(searchTerm)) ||
+                (company.description && company.description.toLowerCase().includes(searchTerm)) ||
+                features.some(f => String(f).toLowerCase().includes(searchTerm));
+            
+            if (!matches) return false;
+        }
+        return true;
+    });
+
+    const sortedFiltered = sortCompanies(filtered);
+    setCompaniesData(sortedFiltered); // Update the filtered data in data-loader
+
+    if (window.app && typeof window.app.renderCompanies === 'function') {
+        window.app.renderCompanies(sortedFiltered);
     } else {
-        console.error('❌ renderCompanies function not found');
+        console.error('❌ renderCompanies function not found on window.app');
     }
     
-    document.getElementById('filteredCount').textContent = filtered.length;
-    if (typeof updateStatistics === 'function') {
-        updateStatistics();
+    // Update statistics via global function
+    if (window.app && typeof window.app.updateStatistics === 'function') {
+        window.app.updateStatistics();
+    } else {
+        console.error('❌ updateStatistics function not found on window.app');
     }
 }
+
+// No DOMContentLoaded listener here, as initialization is handled in index.html and called via initializeFilters

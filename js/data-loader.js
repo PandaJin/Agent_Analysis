@@ -1,70 +1,54 @@
 // 数据加载模块
-// 使用 window 确保全局可访问
-window.companiesData = [];
-window.allCompanies = [];
-window.metadata = {};
+import { parseARRValue, sortCompanies } from './utils.js';
 
-// 为了兼容旧代码，保留局部引用
-let companiesData = window.companiesData;
-let allCompanies = window.allCompanies;
-let metadata = window.metadata;
+let _allCompanies = []; // Stores all loaded companies
+let _companiesData = []; // Stores currently filtered companies
+let _metadata = {}; // Stores metadata like subScenes
 
-const LAYER_ORDER = { infrastructure: 0, llm: 1, platform: 2, application: 3 };
-
-function parseARRValue(arrStr) {
-    if (arrStr == null || arrStr === '') return -1;
-    const str = String(arrStr).trim();
-    if (str === 'N/A') return -1;
-    const match = str.match(/\$?([\d.]+)([BMK]?)/);
-    if (!match) return -1;
-    let amount = parseFloat(match[1]);
-    const unit = (match[2] || '').toUpperCase();
-    if (unit === 'B') amount *= 1000;
-    else if (unit === 'K') amount /= 1000;
-    return amount;
+export function getAllCompanies() {
+    return _allCompanies;
 }
 
-/** 按技术栈层级 → ARR 降序 → 名称 排序，供全局使用 */
-window.sortCompanies = function sortCompanies(list) {
-    return [...list].sort((a, b) => {
-        const orderA = LAYER_ORDER[a.layer] ?? 99;
-        const orderB = LAYER_ORDER[b.layer] ?? 99;
-        if (orderA !== orderB) return orderA - orderB;
-        const arrA = parseARRValue(a.arr);
-        const arrB = parseARRValue(b.arr);
-        if (arrA !== arrB) return arrB - arrA;
-        return (a.name || '').localeCompare(b.name || '', 'zh');
-    });
-};
+export function getCompaniesData() {
+    return _companiesData;
+}
 
-async function loadData() {
+export function setCompaniesData(data) {
+    _companiesData = data;
+}
+
+export function getMetadata() {
+    return _metadata;
+}
+
+export async function loadData() {
     try {
         document.getElementById('loadingSpinner').classList.add('active');
         
         const response = await fetch('data/companies.json');
         const data = await response.json();
         
-        window.allCompanies = allCompanies = window.sortCompanies(data.companies);
-        window.companiesData = companiesData = [...allCompanies];
-        window.metadata = metadata = data.metadata;
+        _allCompanies = sortCompanies(data.companies);
+        _companiesData = [..._allCompanies]; // Initialize filtered data with all companies
+        _metadata = data.metadata;
         
         console.log('✅ Data loaded:', {
-            totalCompanies: allCompanies.length,
-            hasMetadata: !!metadata.subScenes
+            totalCompanies: _allCompanies.length,
+            hasMetadata: !!_metadata.subScenes
         });
         
         // 更新UI
         const lastEl = document.getElementById('lastUpdate');
         if (lastEl) lastEl.textContent = data.lastUpdate;
         
-        // 计算统计数据
-        updateStatistics();
-        
-        // 渲染公司卡片
-        renderCompanies(companiesData);
-        const countEl = document.getElementById('filteredCount');
-        if (countEl) countEl.textContent = companiesData.length;
-        
+        // Use globally exposed functions from app.js
+        if (window.app && typeof window.app.updateStatistics === 'function') {
+            window.app.updateStatistics();
+        }
+        if (window.app && typeof window.app.renderCompanies === 'function') {
+            window.app.renderCompanies(_companiesData);
+        }
+
         document.getElementById('loadingSpinner').classList.remove('active');
         
         return data;
@@ -81,12 +65,12 @@ async function loadData() {
     }
 }
 
-function updateStatistics() {
-    const el = document.getElementById('filteredCount');
-    if (el) el.textContent = (window.companiesData || companiesData || []).length;
+// updateStatistics function should ideally be in a separate UI module or main orchestrator.
+// For now, keep it here but ensure it uses the module's _companiesData
+// This function will be called by window.app.updateStatistics
+export function updateStatistics() {
+    const countEl = document.getElementById('filteredCount');
+    if (countEl) countEl.textContent = _companiesData.length;
 }
 
-// 页面加载时执行
-document.addEventListener('DOMContentLoaded', () => {
-    loadData();
-});
+// No DOMContentLoaded listener here, as initialization is handled in index.html
