@@ -1,251 +1,211 @@
-// 筛选功能模块
-import { getMetadata, getAllCompanies, getCompaniesData, setCompaniesData } from './data-loader.js';
-import { getLayerText, getSceneText, getRegionText, sortCompanies } from './utils.js';
+// 筛选功能模块 — v4.0 agentTag 三级联动 + 多维度筛选
+import { getAllCompanies, getMetadata, setCompaniesData } from './data-loader.js';
+import { sortCompanies } from './utils.js';
+
+const AGENT_TAG_ORDER = ['基础设施层', '大模型层', '平台/框架层', 'Agent中间层', 'Agent应用层'];
 
 let currentFilters = {
-    layer: '',
-    scene: '',
-    region: '',
-    model: '',
-    modelSub: '',
-    subScene: '',
+    agentTag: '',
+    agentTagLevel2: '',
+    agentTagLevel3: '',
+    market: '',
+    isChineseProduct: '',
+    country: '',
+    category: '',
     search: ''
 };
 
-// Function to initialize filters and set up event listeners
+let _searchTimer = null;
+
+// --- Initialization ---
+
 export function initializeFilters() {
-    document.querySelectorAll('.layer-tab').forEach(btn => {
-        btn.addEventListener('click', () => setLayer(btn.dataset.layer || ''));
-    });
-    document.getElementById('regionFilter').addEventListener('change', handleFilterChange);
-    document.getElementById('modelFilter').addEventListener('change', handleModelChange);
-    document.getElementById('searchInput').addEventListener('input', handleSearchChange);
-
-    // Initial application of filters after data load
-    applyFilters();
-}
-
-function handleFilterChange(e) {
-    const filterId = e.target.id;
-    const value = e.target.value;
-    if (filterId === 'regionFilter') currentFilters.region = value;
-    else if (filterId === 'modelFilter') currentFilters.model = value;
-    applyFilters();
-}
-
-function setLayer(value) {
     const metadata = getMetadata();
-    currentFilters.layer = value;
-    currentFilters.scene = '';
-    currentFilters.subScene = '';
+    buildAgentTagTabs(metadata);
+    populateDropdown('marketFilter', metadata.markets || []);
+    populateDropdown('chineseProductFilter', metadata.chineseProducts || []);
+    populateDropdown('countryFilter', metadata.countries || []);
+    populateDropdown('categoryFilter', metadata.categories || []);
 
-    document.querySelectorAll('.layer-tab').forEach(t => {
-        t.classList.toggle('active', (t.dataset.layer || '') === value);
-        t.setAttribute('aria-selected', (t.dataset.layer || '') === value ? 'true' : 'false');
+    document.getElementById('marketFilter').addEventListener('change', e => { currentFilters.market = e.target.value; applyFilters(); });
+    document.getElementById('chineseProductFilter').addEventListener('change', e => { currentFilters.isChineseProduct = e.target.value; applyFilters(); });
+    document.getElementById('countryFilter').addEventListener('change', e => { currentFilters.country = e.target.value; applyFilters(); });
+    document.getElementById('categoryFilter').addEventListener('change', e => { currentFilters.category = e.target.value; applyFilters(); });
+    document.getElementById('searchInput').addEventListener('input', e => {
+        clearTimeout(_searchTimer);
+        _searchTimer = setTimeout(() => { currentFilters.search = e.target.value.trim().toLowerCase(); applyFilters(); }, 200);
     });
 
-    const subFiltersEl = document.getElementById('subFilters');
-    const sceneSubFiltersEl = document.getElementById('sceneSubFilters');
-    sceneSubFiltersEl.classList.remove('active');
-    sceneSubFiltersEl.innerHTML = '';
-
-    if (!value) {
-        subFiltersEl.classList.remove('active');
-        subFiltersEl.innerHTML = '';
-        applyFilters();
-        return;
-    }
-
-    const sceneLabels = metadata.sceneLabels || {};
-    const subScenesConfig = metadata.subScenes || {};
-
-    if (value === 'application') {
-        subFiltersEl.innerHTML = Object.entries(sceneLabels).map(([key, label]) =>
-            `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="scene">${label}</button>`
-        ).join('');
-        subFiltersEl.classList.add('active');
-        subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
-            chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'scene'));
-        });
-    } else if (subScenesConfig[value]) {
-        const subScenes = subScenesConfig[value];
-        subFiltersEl.innerHTML = Object.entries(subScenes).map(([key, label]) =>
-            `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="layerSub">${label}</button>`
-        ).join('');
-        subFiltersEl.classList.add('active');
-        subFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
-            chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'layerSub'));
-        });
-    } else {
-        subFiltersEl.classList.remove('active');
-        subFiltersEl.innerHTML = '';
-    }
     applyFilters();
 }
 
-function handleSubFilterClick(value, type) {
-    const subFiltersEl = document.getElementById('subFilters');
-    const sceneSubFiltersEl = document.getElementById('sceneSubFilters');
-    const metadata = getMetadata();
-    const subScenesConfig = metadata.subScenes || {};
+function populateDropdown(id, values) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const first = el.options[0];
+    el.innerHTML = '';
+    el.appendChild(first);
+    values.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        el.appendChild(opt);
+    });
+}
 
-    // Helper to toggle active class
-    const toggleActiveClass = (element, dataValue) => {
-        element.querySelectorAll('.sub-filter-chip').forEach(chip => {
-            chip.classList.toggle('active', chip.getAttribute('data-value') === dataValue);
-        });
-    };
+// --- Agent Tag Tabs (Level 1) ---
 
-    if (type === 'layerSub') {
-        currentFilters.scene = '';
-        currentFilters.subScene = currentFilters.subScene === value ? '' : value;
-        sceneSubFiltersEl.classList.remove('active');
-        sceneSubFiltersEl.innerHTML = '';
-        toggleActiveClass(subFiltersEl, currentFilters.subScene);
-    } else if (type === 'scene') {
-        currentFilters.subScene = '';
-        currentFilters.scene = currentFilters.scene === value ? '' : value;
-        toggleActiveClass(subFiltersEl, currentFilters.scene);
-        
-        // Third level: only show when application layer and a scene with sub-scenes is selected
-        if (currentFilters.scene && subScenesConfig[currentFilters.scene]) {
-            const subScenes = subScenesConfig[currentFilters.scene];
-            sceneSubFiltersEl.innerHTML = Object.entries(subScenes).map(([key, label]) =>
-                `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="sceneSub">${label}</button>`
-            ).join('');
-            sceneSubFiltersEl.classList.add('active');
-            sceneSubFiltersEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
-                chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'sceneSub'));
-            });
-        } else {
-            sceneSubFiltersEl.classList.remove('active');
-            sceneSubFiltersEl.innerHTML = '';
+function buildAgentTagTabs(metadata) {
+    const container = document.getElementById('agentTagTabs');
+    if (!container) return;
+    const counts = metadata.agentTagCounts || {};
+    const allBtn = createTabButton('', '全部', Object.values(counts).reduce((s, v) => s + v, 0), true);
+    container.appendChild(allBtn);
+
+    AGENT_TAG_ORDER.forEach(tag => {
+        if (counts[tag]) {
+            container.appendChild(createTabButton(tag, tag, counts[tag], false));
         }
-    } else if (type === 'sceneSub') {
-        currentFilters.subScene = currentFilters.subScene === value ? '' : value;
-        toggleActiveClass(sceneSubFiltersEl, currentFilters.subScene);
-    } else if (type === 'model') {
-        currentFilters.modelSub = currentFilters.modelSub === value ? '' : value;
-        toggleActiveClass(document.getElementById('modelSubFilters'), currentFilters.modelSub);
-    }
+    });
+}
 
+function createTabButton(value, label, count, isActive) {
+    const btn = document.createElement('button');
+    btn.className = 'filter-tab' + (isActive ? ' active' : '');
+    btn.dataset.value = value;
+    btn.innerHTML = `${label}<span class="tab-count">${count}</span>`;
+    btn.addEventListener('click', () => setAgentTag(value));
+    return btn;
+}
+
+function setAgentTag(value) {
+    currentFilters.agentTag = value;
+    currentFilters.agentTagLevel2 = '';
+    currentFilters.agentTagLevel3 = '';
+
+    document.querySelectorAll('#agentTagTabs .filter-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.value === value);
+    });
+
+    buildLevel2Chips(value);
+    hideLevel3Chips();
     applyFilters();
 }
 
-function handleModelChange(e) {
-    const value = e.target.value;
-    currentFilters.model = value;
-    currentFilters.modelSub = '';
+// --- Level 2 Chips ---
 
-    const modelSubEl = document.getElementById('modelSubFilters');
-    const metadata = getMetadata();
-    const modelSubCategoriesConfig = metadata.modelSubCategories || {};
-    const categories = modelSubCategoriesConfig[value]; // Directly use from metadata
+function buildLevel2Chips(agentTag) {
+    const container = document.getElementById('level2Chips');
+    container.innerHTML = '';
+    container.classList.remove('active');
 
-    if (value && categories) {
-        modelSubEl.innerHTML = Object.entries(categories).map(([key, label]) =>
-            `<button type="button" class="chip sub-filter-chip" data-value="${key}" data-type="model">${label}</button>`
-        ).join('');
-        modelSubEl.classList.add('active');
-        modelSubEl.querySelectorAll('.sub-filter-chip').forEach(chip => {
-            chip.addEventListener('click', () => handleSubFilterClick(chip.dataset.value, 'model'));
-        });
+    if (!agentTag) return;
+    const tree = getMetadata().agentTagTree || {};
+    const level2 = tree[agentTag];
+    if (!level2 || !Object.keys(level2).length) return;
+
+    const allCompanies = getAllCompanies();
+    Object.keys(level2).sort((a, b) => a.localeCompare(b, 'zh')).forEach(key => {
+        const count = allCompanies.filter(c => c.agentTag === agentTag && c.agentTagLevel2 === key).length;
+        const chip = document.createElement('button');
+        chip.className = 'filter-chip';
+        chip.dataset.value = key;
+        chip.innerHTML = `${key}<span class="chip-count">${count}</span>`;
+        chip.addEventListener('click', () => setLevel2(key));
+        container.appendChild(chip);
+    });
+    container.classList.add('active');
+}
+
+function setLevel2(value) {
+    currentFilters.agentTagLevel2 = currentFilters.agentTagLevel2 === value ? '' : value;
+    currentFilters.agentTagLevel3 = '';
+
+    document.querySelectorAll('#level2Chips .filter-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.value === currentFilters.agentTagLevel2);
+    });
+
+    if (currentFilters.agentTagLevel2) {
+        buildLevel3Chips(currentFilters.agentTag, currentFilters.agentTagLevel2);
     } else {
-        modelSubEl.classList.remove('active');
-        modelSubEl.innerHTML = '';
+        hideLevel3Chips();
     }
     applyFilters();
 }
 
-function handleSearchChange(e) {
-    currentFilters.search = e.target.value.toLowerCase();
+// --- Level 3 Chips ---
+
+function buildLevel3Chips(agentTag, level2) {
+    const container = document.getElementById('level3Chips');
+    container.innerHTML = '';
+    container.classList.remove('active');
+
+    const tree = getMetadata().agentTagTree || {};
+    const level3 = tree[agentTag]?.[level2];
+    if (!level3 || !Object.keys(level3).length) return;
+
+    Object.entries(level3).sort((a, b) => b[1] - a[1]).forEach(([key, count]) => {
+        const chip = document.createElement('button');
+        chip.className = 'filter-chip';
+        chip.dataset.value = key;
+        chip.innerHTML = `${key}<span class="chip-count">${count}</span>`;
+        chip.addEventListener('click', () => setLevel3(key));
+        container.appendChild(chip);
+    });
+    container.classList.add('active');
+}
+
+function setLevel3(value) {
+    currentFilters.agentTagLevel3 = currentFilters.agentTagLevel3 === value ? '' : value;
+    document.querySelectorAll('#level3Chips .filter-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.value === currentFilters.agentTagLevel3);
+    });
     applyFilters();
 }
 
-// Apply all filter conditions
+function hideLevel3Chips() {
+    const container = document.getElementById('level3Chips');
+    container.innerHTML = '';
+    container.classList.remove('active');
+}
+
+// --- Apply Filters ---
+
 export function applyFilters() {
     const allCompanies = getAllCompanies();
-    if (!allCompanies.length) {
-        console.warn('⚠️ allCompanies not ready yet');
-        return;
-    }
-    
-    let filtered = allCompanies.filter(company => {
-        // Layer filter
-        if (currentFilters.layer && company.layer !== currentFilters.layer) {
-            return false;
-        }
+    if (!allCompanies.length) return;
 
-        // Sub-scene filter (depends on layer)
-        if (currentFilters.layer && currentFilters.subScene) {
-            // For application layer, subScene is a specific sub-category within a scene
-            // For other layers, subScene is a direct sub-category of the layer
-            if (company.layer === 'application') {
-                 // Check if the company's scene matches the current scene filter, 
-                 // AND if its subScene matches the current subScene filter.
-                 // This assumes metadata defines subScenes nested under primary scenes.
-                 // The current implementation in setLayer and handleSubFilterClick implies
-                 // that currentFilters.subScene is a sub-category directly.
-                 // Need to re-evaluate metadata structure to ensure this logic is correct.
-                 // For now, assuming company.subScene directly holds the selected sub-scene value.
-                if (currentFilters.scene && company.scene !== currentFilters.scene) return false;
-                if (company.subScene !== currentFilters.subScene) return false;
+    const filtered = allCompanies.filter(c => {
+        if (currentFilters.agentTag && c.agentTag !== currentFilters.agentTag) return false;
+        if (currentFilters.agentTagLevel2 && c.agentTagLevel2 !== currentFilters.agentTagLevel2) return false;
+        if (currentFilters.agentTagLevel3 && c.agentTagLevel3 !== currentFilters.agentTagLevel3) return false;
+        if (currentFilters.market && c.market !== currentFilters.market) return false;
+        if (currentFilters.isChineseProduct && c.isChineseProduct !== currentFilters.isChineseProduct) return false;
+        if (currentFilters.country && c.country !== currentFilters.country) return false;
+        if (currentFilters.category && c.category !== currentFilters.category) return false;
 
-            } else {
-                if (company.subScene !== currentFilters.subScene) return false;
-            }
-        } else if (currentFilters.layer === 'application' && currentFilters.scene && company.scene !== currentFilters.scene) {
-            // If application layer and only scene is selected (no sub-scene)
-            return false;
-        }
-
-
-        // Region filter
-        if (currentFilters.region && company.region !== currentFilters.region) {
-            return false;
-        }
-
-        // Model filter
-        if (currentFilters.model && company.model !== currentFilters.model) {
-            return false;
-        }
-
-        // Model sub-category filter
-        if (currentFilters.modelSub && company.modelSub !== currentFilters.modelSub) {
-            return false;
-        }
-
-        // Search filter
         if (currentFilters.search) {
-            const searchTerm = currentFilters.search;
-            const features = Array.isArray(company.features) ? company.features : [company.features];
-            
-            const matches = 
-                (company.name && company.name.toLowerCase().includes(searchTerm)) ||
-                (company.nameEn && company.nameEn.toLowerCase().includes(searchTerm)) ||
-                (company.description && company.description.toLowerCase().includes(searchTerm)) ||
-                features.some(f => String(f).toLowerCase().includes(searchTerm));
-            
-            if (!matches) return false;
+            const q = currentFilters.search;
+            const fields = [
+                c.name, c.nameEn, c.company, c.description,
+                c.agentTag, c.agentTagLevel2, c.agentTagLevel3,
+                c.category, c.country,
+                c.tencentTrack1, c.tencentTrack2, c.tencentTrack3,
+                ...(Array.isArray(c.features) ? c.features : [])
+            ];
+            if (!fields.some(f => f && String(f).toLowerCase().includes(q))) return false;
         }
         return true;
     });
 
-    const sortedFiltered = sortCompanies(filtered);
-    setCompaniesData(sortedFiltered); // Update the filtered data in data-loader
+    const sorted = sortCompanies(filtered);
+    setCompaniesData(sorted);
 
-    if (window.app && typeof window.app.renderCompanies === 'function') {
-        window.app.renderCompanies(sortedFiltered);
-    } else {
-        console.error('❌ renderCompanies function not found on window.app');
-    }
-    
-    // Update statistics via global function
-    if (window.app && typeof window.app.updateStatistics === 'function') {
-        window.app.updateStatistics();
-    } else {
-        console.error('❌ updateStatistics function not found on window.app');
-    }
+    if (window.app?.renderCompanies) window.app.renderCompanies(sorted);
+    updateStatistics();
 }
 
-// No DOMContentLoaded listener here, as initialization is handled in index.html and called via initializeFilters
+export function updateStatistics() {
+    const el = document.getElementById('filteredCount');
+    if (el) el.textContent = getMetadata() ? (window.app?.getCompaniesData?.()?.length ?? 0) : 0;
+}

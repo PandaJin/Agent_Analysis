@@ -4,38 +4,105 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>AI Agent 生态玩家地图</title>
-    <meta name="description" content="追踪全球 120+ AI Agent 产业链核心玩家">
+    <meta name="description" content="追踪全球 900+ AI Agent 产业链核心玩家">
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="header-left">
+                <h1>AI Agent 生态玩家地图</h1>
+                <p class="subtitle">追踪全球 900+ AI Agent 产业链核心玩家 · 更新于 <span id="lastUpdate">—</span></p>
+            </div>
+            <div class="header-right">
+                <button id="exportExcel" class="export-btn">导出 Excel</button>
+                <button id="exportPDF" class="export-btn">导出 PDF</button>
+            </div>
+        </header>
+
+        <section class="search-section">
+            <input id="searchInput" class="search-input" type="text" placeholder="搜索产品、公司、标签、国家...">
+        </section>
+
+        <section class="filters">
+            <div class="filter-tabs" id="agentTagTabs"></div>
+            <div class="filter-chips" id="level2Chips"></div>
+            <div class="filter-chips" id="level3Chips"></div>
+            <div class="filter-dropdowns">
+                <div class="filter-group">
+                    <label>市场</label>
+                    <select id="marketFilter"><option value="">全部</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>华人产品</label>
+                    <select id="chineseProductFilter"><option value="">全部</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>国家</label>
+                    <select id="countryFilter"><option value="">全部</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>分类</label>
+                    <select id="categoryFilter"><option value="">全部</option></select>
+                </div>
+            </div>
+            <div class="filter-summary">
+                <span class="filter-count">显示 <strong id="filteredCount">0</strong> / <span id="totalCount">0</span> 家产品/公司</span>
+            </div>
+        </section>
+
+        <section class="content">
+            <div class="spinner" id="loadingSpinner"></div>
+            <div class="cards-grid" id="playersContainer"></div>
+            <div class="load-more-wrap" id="loadMoreWrap" style="display:none;">
+                <button id="loadMoreBtn" class="load-more-btn">加载更多</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 id="modalTitle" class="modal-title"></h2>
+                    <p id="modalSubtitle" class="modal-subtitle"></p>
+                </div>
+                <button class="close-btn" onclick="window.app.closeModal()">&times;</button>
+            </div>
+            <div class="detail-tabs">
+                <button class="detail-tab active" data-tab="overview">概览</button>
+                <button class="detail-tab" data-tab="business">商业</button>
+                <button class="detail-tab" data-tab="funding">融资</button>
+                <button class="detail-tab" data-tab="links">链接</button>
+            </div>
+            <div id="modalBody">
+                <div id="tab-overview" class="tab-content active"></div>
+                <div id="tab-business" class="tab-content"></div>
+                <div id="tab-funding" class="tab-content"></div>
+                <div id="tab-links" class="tab-content"></div>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
-        import { showCompanyDetail, closeModal, renderCompanies } from './js/app.js';
+        import { renderCompanies, showCompanyDetail, closeModal, loadMore } from './js/app.js';
         import { loadData, getCompaniesData, getAllCompanies, getMetadata, setCompaniesData } from './js/data-loader.js';
         import { applyFilters, initializeFilters, updateStatistics } from './js/filters.js';
         import { exportToExcel, exportToPDF } from './js/export.js';
 
-        // Expose functions globally for inline HTML event handlers
         window.app = {
-            showCompanyDetail: showCompanyDetail,
-            closeModal: closeModal,
-            renderCompanies: renderCompanies,
-            loadData: loadData,
-            getCompaniesData: getCompaniesData,
-            getAllCompanies: getAllCompanies,
-            getMetadata: getMetadata,
-            setCompaniesData: setCompaniesData,
-            applyFilters: applyFilters,
-            initializeFilters: initializeFilters,
-            updateStatistics: updateStatistics,
-            exportToExcel: exportToExcel,
-            exportToPDF: exportToPDF
+            showCompanyDetail, closeModal, renderCompanies, loadMore,
+            loadData, getCompaniesData, getAllCompanies, getMetadata, setCompaniesData,
+            applyFilters, initializeFilters, updateStatistics,
+            exportToExcel, exportToPDF
         };
 
-        // Initial data load and filter setup
         document.addEventListener('DOMContentLoaded', async () => {
             await window.app.loadData();
-            window.app.initializeFilters(); // Call initializeFilters after data is loaded
+            window.app.initializeFilters();
         });
     </script>
 </body>

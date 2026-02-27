@@ -17,9 +17,12 @@ console.log('🔍 开始数据校验...\n');
 let hasErrors = false;
 
 try {
-    // 读取数据
+    // 读取数据（schema 可选）
     const data = JSON.parse(fs.readFileSync(companiesPath, 'utf8'));
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+    let schema = null;
+    if (fs.existsSync(schemaPath)) {
+        try { schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8')); } catch (_) {}
+    }
     
     console.log(`📊 总公司数: ${data.companies.length}`);
     console.log(`📅 最后更新: ${data.lastUpdate}\n`);
@@ -30,14 +33,18 @@ try {
     
     data.companies.forEach((company, index) => {
         const errors = [];
+        const warnings = [];
         
-        // 必填字段检查
-        const required = ['id', 'name', 'nameEn', 'layer', 'region', 'model', 'description'];
+        // 必填字段检查（v4.0：layer/region/model 可选，以 agentTag 等为主）
+        const required = ['id', 'name', 'description'];
         required.forEach(field => {
-            if (!company[field]) {
+            if (company[field] === undefined || company[field] === null) {
                 errors.push(`缺少必填字段: ${field}`);
             }
         });
+        if (!company.nameEn && !company.name) {
+            errors.push('name 与 nameEn 至少填一项');
+        }
         
         // ID唯一性
         if (ids.has(company.id)) {
@@ -45,31 +52,26 @@ try {
         }
         ids.add(company.id);
         
-        // 名称唯一性
-        if (names.has(company.name)) {
-            errors.push(`公司名称 "${company.name}" 重复`);
-        }
-        names.add(company.name);
+        // 名称可重复（同一公司多产品），仅记录用于统计
+        if (company.name) names.add(company.name);
         
-        // 枚举值检查
+        // 枚举值检查（可选字段，有值时才校验）
         const validLayers = ['infrastructure', 'llm', 'platform', 'application'];
         if (company.layer && !validLayers.includes(company.layer)) {
             errors.push(`无效的 layer 值: ${company.layer}`);
         }
-        
         const validRegions = ['china', 'overseas', 'global'];
         if (company.region && !validRegions.includes(company.region)) {
-            errors.push(`无效的 region 值: ${company.region}`);
+            warnings.push(`建议 region 为 china/overseas/global，当前: ${company.region}`);
         }
-        
         const validModels = ['2b', '2c', '2b2c'];
         if (company.model && !validModels.includes(company.model)) {
-            errors.push(`无效的 model 值: ${company.model}`);
+            warnings.push(`建议 model 为 2b/2c/2b2c，当前: ${company.model}`);
         }
         
-        // 描述长度检查
-        if (company.description && (company.description.length < 10 || company.description.length > 500)) {
-            errors.push(`描述长度不符合要求 (10-500字): 当前 ${company.description.length} 字`);
+        // 描述长度检查（v4.0 合并 Excel 后放宽：仅超长报错）
+        if (company.description && company.description.length > 500) {
+            errors.push(`描述超过500字: 当前 ${company.description.length} 字`);
         }
         
         // URL格式检查
@@ -77,12 +79,15 @@ try {
             errors.push(`网站URL格式错误: ${company.website}`);
         }
         
-        // 输出错误
+        // 仅错误阻断，警告只打印
         if (errors.length > 0) {
             hasErrors = true;
             console.log(`❌ 公司 #${index + 1} (${company.name}) 存在问题:`);
             errors.forEach(err => console.log(`   - ${err}`));
+            warnings.forEach(w => console.log(`   ⚠ ${w}`));
             console.log('');
+        } else if (warnings.length > 0 && index < 20) {
+            console.log(`⚠ 公司 #${index + 1} (${company.name}): ${warnings.join('; ')}`);
         }
     });
     
