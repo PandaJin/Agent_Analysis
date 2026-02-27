@@ -235,3 +235,33 @@ document.getElementById('detailModal')?.addEventListener('click', e => {
 document.getElementById('loadMoreBtn')?.addEventListener('click', () => {
     if (window.app?.loadMore) window.app.loadMore();
 });
+
+// --- Back to Top & Sticky Search ---
+
+const backToTopBtn = document.getElementById('backToTop');
+const searchSection = document.querySelector('.search-section');
+let _ticking = false;
+
+function onScroll() {
+    if (_ticking) return;
+    _ticking = true;
+    requestAnimationFrame(() => {
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+
+        if (backToTopBtn) {
+            backToTopBtn.classList.toggle('visible', scrollY > 400);
+        }
+
+        if (searchSection) {
+            searchSection.classList.toggle('scrolled', scrollY > 120);
+        }
+
+        _ticking = false;
+    });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+
+backToTopBtn?.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+});

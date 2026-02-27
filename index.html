@@ -6,20 +6,12 @@
     <title>AI Agent 生态玩家地图</title>
     <meta name="description" content="追踪全球 900+ AI Agent 产业链核心玩家">
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header class="main-header">
-            <div class="header-left">
-                <h1>AI Agent 生态玩家地图</h1>
-                <p class="subtitle">追踪全球 900+ AI Agent 产业链核心玩家 · 更新于 <span id="lastUpdate">—</span></p>
-            </div>
-            <div class="header-right">
-                <button id="exportExcel" class="export-btn">导出 Excel</button>
-                <button id="exportPDF" class="export-btn">导出 PDF</button>
-            </div>
+            <h1>AI Agent 生态玩家地图</h1>
+            <p class="subtitle">追踪全球 900+ AI Agent 产业链核心玩家 · 更新于 <span id="lastUpdate">—</span></p>
         </header>
 
         <section class="search-section">
@@ -62,6 +54,11 @@
         </section>
     </div>
 
+    <!-- Back to Top -->
+    <button class="back-to-top" id="backToTop" aria-label="回到顶部">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 4L4 10h4v6h4v-6h4L10 4z" fill="currentColor"/></svg>
+    </button>
+
     <!-- Detail Modal -->
     <div class="modal" id="detailModal">
         <div class="modal-content">
@@ -91,13 +88,11 @@
         import { renderCompanies, showCompanyDetail, closeModal, loadMore } from './js/app.js';
         import { loadData, getCompaniesData, getAllCompanies, getMetadata, setCompaniesData } from './js/data-loader.js';
         import { applyFilters, initializeFilters, updateStatistics } from './js/filters.js';
-        import { exportToExcel, exportToPDF } from './js/export.js';
 
         window.app = {
             showCompanyDetail, closeModal, renderCompanies, loadMore,
             loadData, getCompaniesData, getAllCompanies, getMetadata, setCompaniesData,
-            applyFilters, initializeFilters, updateStatistics,
-            exportToExcel, exportToPDF
+            applyFilters, initializeFilters, updateStatistics
         };
 
         document.addEventListener('DOMContentLoaded', async () => {

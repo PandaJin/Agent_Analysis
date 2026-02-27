@@ -82,6 +82,10 @@ function setAgentTag(value) {
     currentFilters.agentTag = value;
     currentFilters.agentTagLevel2 = '';
     currentFilters.agentTagLevel3 = '';
+    currentFilters.market = '';
+    currentFilters.isChineseProduct = '';
+    currentFilters.country = '';
+    currentFilters.category = '';
 
     document.querySelectorAll('#agentTagTabs .filter-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.value === value);
@@ -171,30 +175,36 @@ function hideLevel3Chips() {
 
 // --- Apply Filters ---
 
+function matchSearch(c, q) {
+    const fields = [
+        c.name, c.nameEn, c.company, c.description,
+        c.agentTag, c.agentTagLevel2, c.agentTagLevel3,
+        c.category, c.country,
+        c.tencentTrack1, c.tencentTrack2, c.tencentTrack3,
+        ...(Array.isArray(c.features) ? c.features : [])
+    ];
+    return fields.some(f => f && String(f).toLowerCase().includes(q));
+}
+
 export function applyFilters() {
     const allCompanies = getAllCompanies();
     if (!allCompanies.length) return;
 
-    const filtered = allCompanies.filter(c => {
+    const baseSet = allCompanies.filter(c => {
         if (currentFilters.agentTag && c.agentTag !== currentFilters.agentTag) return false;
         if (currentFilters.agentTagLevel2 && c.agentTagLevel2 !== currentFilters.agentTagLevel2) return false;
         if (currentFilters.agentTagLevel3 && c.agentTagLevel3 !== currentFilters.agentTagLevel3) return false;
+        if (currentFilters.search && !matchSearch(c, currentFilters.search)) return false;
+        return true;
+    });
+
+    updateDropdownOptions(baseSet);
+
+    const filtered = baseSet.filter(c => {
         if (currentFilters.market && c.market !== currentFilters.market) return false;
         if (currentFilters.isChineseProduct && c.isChineseProduct !== currentFilters.isChineseProduct) return false;
         if (currentFilters.country && c.country !== currentFilters.country) return false;
         if (currentFilters.category && c.category !== currentFilters.category) return false;
-
-        if (currentFilters.search) {
-            const q = currentFilters.search;
-            const fields = [
-                c.name, c.nameEn, c.company, c.description,
-                c.agentTag, c.agentTagLevel2, c.agentTagLevel3,
-                c.category, c.country,
-                c.tencentTrack1, c.tencentTrack2, c.tencentTrack3,
-                ...(Array.isArray(c.features) ? c.features : [])
-            ];
-            if (!fields.some(f => f && String(f).toLowerCase().includes(q))) return false;
-        }
         return true;
     });
 
@@ -203,6 +213,49 @@ export function applyFilters() {
 
     if (window.app?.renderCompanies) window.app.renderCompanies(sorted);
     updateStatistics();
+}
+
+function updateDropdownOptions(baseSet) {
+    const markets = new Set();
+    const chineseProducts = new Set();
+    const countries = new Set();
+    const categories = new Set();
+
+    baseSet.forEach(c => {
+        if (c.market) markets.add(c.market);
+        if (c.isChineseProduct) chineseProducts.add(c.isChineseProduct);
+        if (c.country) countries.add(c.country);
+        if (c.category) categories.add(c.category);
+    });
+
+    syncDropdown('marketFilter', [...markets].sort(), currentFilters, 'market');
+    syncDropdown('chineseProductFilter', [...chineseProducts].sort(), currentFilters, 'isChineseProduct');
+    syncDropdown('countryFilter', [...countries].sort((a, b) => a.localeCompare(b, 'zh')), currentFilters, 'country');
+    syncDropdown('categoryFilter', [...categories].sort((a, b) => a.localeCompare(b, 'zh')), currentFilters, 'category');
+}
+
+function syncDropdown(id, values, filters, filterKey) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = filters[filterKey];
+    el.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = '全部';
+    el.appendChild(allOpt);
+    values.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        el.appendChild(opt);
+    });
+    if (prev && values.includes(prev)) {
+        el.value = prev;
+    } else {
+        el.value = '';
+        filters[filterKey] = '';
+    }
+    el.disabled = values.length === 0;
 }
 
 export function updateStatistics() {

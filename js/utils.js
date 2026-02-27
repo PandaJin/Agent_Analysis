@@ -21,17 +21,20 @@ export function escapeHtml(str) {
 
 export function getCompanyLogoHtml(company) {
     const fallbackText = (company.logo || (company.name || '').substring(0, 2));
+    const fallbackSpan = `<span class="logo-fallback" style="display:none">${fallbackText}</span>`;
+    const onErr = `this.style.display='none';this.nextElementSibling.style.display='flex'`;
+
     if (company.logoUrl) {
-        return `<img src="${company.logoUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><span class="logo-fallback" style="display:none;">${fallbackText}</span>`;
+        return `<img src="${company.logoUrl}" alt="" loading="lazy" onerror="${onErr}" />${fallbackSpan}`;
     }
     if (company.website) {
         try {
             const domain = new URL(company.website).hostname.replace(/^www\./, '');
             const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
-            return `<img src="${faviconUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><span class="logo-fallback" style="display:none;">${fallbackText}</span>`;
+            return `<img src="${faviconUrl}" alt="" loading="lazy" onerror="${onErr}" />${fallbackSpan}`;
         } catch (_) {}
     }
-    return fallbackText;
+    return `<span class="logo-fallback">${fallbackText}</span>`;
 }
 
 // --- Display helpers ---
